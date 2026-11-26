@@ -1,0 +1,32 @@
+name: CI
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mariadb:10.11
+        env:
+          MARIADB_DATABASE: climat_test
+          MARIADB_USER: test
+          MARIADB_PASSWORD: test
+          MARIADB_RANDOM_ROOT_PASSWORD: "1"
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.5"
+          extensions: pdo_mysql, curl, mbstring
+      - name: Vérification syntaxique PHP
+        run: find api app dev tests -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Vérification syntaxique JavaScript
+        run: for f in public/assets/js/*.js; do node --check "$f"; done
+      - name: Tests d'intégration
+        run: ./tests/run.sh
