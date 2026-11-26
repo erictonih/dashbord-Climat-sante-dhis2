@@ -1,0 +1,26 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "outputDirectory": "public",
+  "regions": ["cdg1"],
+  "functions": {
+    "api/index.php": { "runtime": "vercel-php@0.9.0", "maxDuration": 60 }
+  },
+  "rewrites": [
+    { "source": "/((?!assets/).*)", "destination": "/api/index" }
+  ],
+  "headers": [
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=86400, stale-while-revalidate=604800" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" }
+      ]
+    }
+  ],
+  "crons": [
+    { "path": "/cron/mapping", "schedule": "0 1 * * *" },
+    { "path": "/cron/climat", "schedule": "0 2 * * *" },
+    { "path": "/cron/sante", "schedule": "0 3 * * *" }
+  ]
+}

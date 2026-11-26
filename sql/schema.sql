@@ -1,67 +1,69 @@
--- =====================================================
--- Schéma de la base de données : Climat & Santé
--- Compatible MySQL / MariaDB (InfinityFree)
--- =====================================================
+-- Climat & Santé — schéma correspondant à l'application (MySQL 8 / MariaDB / TiDB).
+-- Non destructif : CREATE TABLE IF NOT EXISTS uniquement.
+-- Les tables climat et santé référencent la commune par son NOM.
 
 CREATE TABLE IF NOT EXISTS communes (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(50) DEFAULT NULL,
     nom VARCHAR(150) NOT NULL,
+    district VARCHAR(150) DEFAULT NULL,
     region VARCHAR(150) DEFAULT NULL,
-    latitude DECIMAL(9,6) NOT NULL,
-    longitude DECIMAL(9,6) NOT NULL,
-    population INT DEFAULT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    latitude DECIMAL(9,6) DEFAULT NULL,
+    longitude DECIMAL(9,6) DEFAULT NULL,
+    KEY idx_communes_nom (nom)
+) DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS climat (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    commune_id INT NOT NULL,
+    commune VARCHAR(150) NOT NULL,
     date DATE NOT NULL,
-    temperature DECIMAL(5,2) DEFAULT NULL,      -- T2M (°C)
-    precipitation DECIMAL(6,2) DEFAULT NULL,    -- PRECTOTCORR (mm)
-    humidite DECIMAL(5,2) DEFAULT NULL,         -- RH2M (%)
-    vent DECIMAL(5,2) DEFAULT NULL,             -- WS2M (m/s)
-    source VARCHAR(50) DEFAULT 'NASA_POWER',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uniq_commune_date (commune_id, date),
-    CONSTRAINT fk_climat_commune FOREIGN KEY (commune_id) REFERENCES communes(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    temperature DECIMAL(5,2) DEFAULT NULL,
+    precipitation DECIMAL(7,2) DEFAULT NULL,
+    pluie DECIMAL(7,2) DEFAULT NULL,
+    humidite DECIMAL(5,2) DEFAULT NULL,
+    vent DECIMAL(5,2) DEFAULT NULL,
+    rayonnement DECIMAL(7,2) DEFAULT NULL,
+    KEY idx_climat_commune_date (commune, date),
+    KEY idx_climat_date (date)
+) DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS maladies (
+CREATE TABLE IF NOT EXISTS sante (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    commune_id INT NOT NULL,
+    commune VARCHAR(150) NOT NULL,
     date DATE NOT NULL,
-    type ENUM('paludisme','diarrhee','infection_respiratoire','grippe','autre') NOT NULL,
+    maladie VARCHAR(100) NOT NULL,
     nb_cas INT NOT NULL DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_maladies_commune FOREIGN KEY (commune_id) REFERENCES communes(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    KEY idx_sante_commune_date (commune, date, maladie),
+    KEY idx_sante_date (date),
+    KEY idx_sante_maladie (maladie)
+) DEFAULT CHARSET=utf8mb4;
 
--- Table optionnelle pour stocker les résultats de corrélation déjà calculés
-CREATE TABLE IF NOT EXISTS correlations (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    commune_id INT DEFAULT NULL, -- NULL = corrélation globale (toutes communes)
-    variable_climat ENUM('temperature','precipitation','humidite','vent') NOT NULL,
-    variable_sante ENUM('paludisme','diarrhee','infection_respiratoire','grippe') NOT NULL,
-    coefficient_pearson DECIMAL(6,4) NOT NULL,
-    nb_observations INT NOT NULL,
-    calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS dhis2_ou_mapping (
+    commune VARCHAR(150) PRIMARY KEY,
+    ou_id VARCHAR(11) NOT NULL,
+    ou_name VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) DEFAULT CHARSET=utf8mb4;
 
--- Table pour stocker un indice de risque calculé par commune / date
-CREATE TABLE IF NOT EXISTS risques (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    commune_id INT NOT NULL,
-    date DATE NOT NULL,
-    indice_risque DECIMAL(5,2) NOT NULL, -- 0 à 100
-    niveau ENUM('faible','moyen','eleve') NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uniq_commune_date_risque (commune_id, date),
-    CONSTRAINT fk_risques_commune FOREIGN KEY (commune_id) REFERENCES communes(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS dhis2_de_mapping (
+    de_id VARCHAR(11) PRIMARY KEY,
+    de_name VARCHAR(255) DEFAULT NULL,
+    maladie VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) DEFAULT CHARSET=utf8mb4;
 
--- Exemple de données (à adapter)
-INSERT INTO communes (nom, region, latitude, longitude, population) VALUES
-('Antananarivo', 'Analamanga', -18.879100, 47.507900, 1300000),
-('Toamasina', 'Atsinanana', -18.166600, 49.383300, 300000),
-('Mahajanga', 'Boeny', -15.716700, 46.316700, 250000);
+CREATE TABLE IF NOT EXISTS app_state (
+    cle VARCHAR(64) PRIMARY KEY,
+    valeur VARCHAR(255) NOT NULL
+) DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS login_attempts (
+    ip_key CHAR(40) NOT NULL,
+    ts INT UNSIGNED NOT NULL,
+    KEY idx_login (ip_key, ts)
+) DEFAULT CHARSET=utf8mb4;
+
+-- Index conseillés sur une base existante (à exécuter une seule fois, après vérification) :
+-- ALTER TABLE climat ADD INDEX idx_climat_commune_date (commune, date), ADD INDEX idx_climat_date (date);
+-- ALTER TABLE sante  ADD INDEX idx_sante_commune_date (commune, date, maladie), ADD INDEX idx_sante_date (date);
+-- ALTER TABLE communes ADD INDEX idx_communes_nom (nom);
