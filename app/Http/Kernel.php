@@ -127,11 +127,15 @@ final class Kernel
 
     private static function assertSameOrigin(): void
     {
+        // Posé par le navigateur, non modifiable par un site tiers.
+        if (($_SERVER['HTTP_SEC_FETCH_SITE'] ?? null) === 'same-origin') return;
         $origin = $_SERVER['HTTP_ORIGIN'] ?? null;
         if ($origin === null) return;
         $host = parse_url($origin, PHP_URL_HOST);
         $port = parse_url($origin, PHP_URL_PORT);
-        if ($host . ($port ? ":$port" : '') !== ($_SERVER['HTTP_HOST'] ?? '')) {
+        $hosts = [$_SERVER['HTTP_HOST'] ?? null];
+        if (Config::get('VERCEL') !== null) $hosts[] = $_SERVER['HTTP_X_FORWARDED_HOST'] ?? null;
+        if (!in_array($host . ($port ? ":$port" : ''), $hosts, true)) {
             throw new HttpError(403, 'bad_origin', 'Origine de la requête refusée.');
         }
     }
